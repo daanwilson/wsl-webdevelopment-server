@@ -27,9 +27,9 @@ MYSQL_ADMIN_PASS=""
 MYSQL_ADMIN_PASS_CONFIRM="different"
 
 while [ "$MYSQL_ADMIN_PASS" != "$MYSQL_ADMIN_PASS_CONFIRM" ]; do
-    read -sp "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS
+    read -s -p "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS < /dev/tty
     echo ""
-    read -sp "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM
+    read -s -p "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM < /dev/tty
     echo ""
     
     if [ "$MYSQL_ADMIN_PASS" != "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
