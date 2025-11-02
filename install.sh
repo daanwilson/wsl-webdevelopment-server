@@ -155,9 +155,17 @@ if [ -f "$PHPMYADMIN_CONFIG" ]; then
   # Maak backup van originele config
   sudo cp "$PHPMYADMIN_CONFIG" "${PHPMYADMIN_CONFIG}.bak"
   
-  # Zoek of AllowNoPassword al bestaat en pas aan, of voeg toe
-  if sudo grep -q "\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
-    # Bestaat al, pas aan naar true
+  # Check of de regel in commentaar staat en haal uit commentaar
+  if sudo grep -q "^[[:space:]]*//[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
+    # Regel staat in commentaar (//), haal uit commentaar en zet op true
+    sudo sed -i "s|^[[:space:]]*//[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\].*|\$cfg['Servers'][\$i]['AllowNoPassword'] = true;|" "$PHPMYADMIN_CONFIG"
+    echo "✅ AllowNoPassword uit commentaar gehaald en ingesteld op true."
+  elif sudo grep -q "^[[:space:]]*#[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
+    # Regel staat in commentaar (#), haal uit commentaar en zet op true
+    sudo sed -i "s|^[[:space:]]*#[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\].*|\$cfg['Servers'][\$i]['AllowNoPassword'] = true;|" "$PHPMYADMIN_CONFIG"
+    echo "✅ AllowNoPassword uit commentaar gehaald en ingesteld op true."
+  elif sudo grep -q "\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
+    # Bestaat al (niet in commentaar), pas aan naar true
     sudo sed -i "s/\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]\s*=\s*false;/\$cfg['Servers'][\$i]['AllowNoPassword'] = true;/" "$PHPMYADMIN_CONFIG"
     echo "✅ AllowNoPassword aangepast naar true."
   else
