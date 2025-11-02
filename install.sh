@@ -6,18 +6,34 @@ set -euo pipefail
 # - schakelt extensies in: zip, gd, soap, xml, mysqli, pdo_mysql, curl
 # - past php.ini aan (enkele dev-settings)
 # - installeert phpMyAdmin en activeert de config voor Apache
-# - maakt MySQL gebruiker 'Daan'@'localhost' met leeg wachtwoord en ALL PRIVILEGES
-# - schakelt AllowNoPassword in voor phpMyAdmin
+# - maakt MySQL root gebruiker aan met custom username en wachtwoord
 # =====================================================
 
 WEBROOT="/var/www/html"
-DB_NAME="projectdb"
-DB_USER="devuser"
-DB_PASS="devpass"
-MYSQL_ADMIN_USER="daan"
-MYSQL_ADMIN_PASS=""   # leeg wachtwoord (intentioneel voor lokaal dev)
 
 echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
+echo ""
+
+# -------------------------
+# Vraag om database credentials
+# -------------------------
+echo "📝 Database configuratie:"
+read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER
+while true; do
+    read -sp "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS
+    echo ""
+    read -sp "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM
+    echo ""
+    if [ "$MYSQL_ADMIN_PASS" = "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
+        break
+    else
+        echo "❌ Wachtwoorden komen niet overeen. Probeer opnieuw."
+    fi
+done
+
+echo ""
+echo "✅ Credentials ingesteld voor gebruiker: $MYSQL_ADMIN_USER"
+echo ""
 
 # -------------------------
 # Updates & basispakketten
@@ -96,9 +112,6 @@ sudo systemctl enable mariadb
 sudo systemctl start mariadb
 
 # Voer mysql_secure_installation-achtige stappen non-interactief:
-# Binnen WSL is default root auth via unix_socket, we voeren minimale veilige defaults maar
-# omdat we willen Daan zonder wachtwoord maken, slaan we dat apart over.
-# We run minimal "remove test DB" style commands.
 sudo mysql -u root <<'SQL'
 -- minimal cleanup (ok to run even if already set)
 DELETE FROM mysql.user WHERE User='';
@@ -108,17 +121,17 @@ FLUSH PRIVILEGES;
 SQL
 
 # -------------------------
-# Maak admin user met leeg wachtwoord (LOCAL ONLY)
+# Maak admin user met wachtwoord
 # -------------------------
-echo "🔐 Aanmaken MySQL admin user '$MYSQL_ADMIN_USER' met leeg wachtwoord (localhost only)"
-# Create user with empty password and give ALL PRIVILEGES on *.* and grant option
+echo "🔐 Aanmaken MySQL admin user '$MYSQL_ADMIN_USER' met wachtwoord..."
+# Create user with password and give ALL PRIVILEGES on *.* and grant option
 sudo mysql -u root <<SQL
-CREATE USER IF NOT EXISTS '${MYSQL_ADMIN_USER}'@'localhost' IDENTIFIED BY '';
+CREATE USER IF NOT EXISTS '${MYSQL_ADMIN_USER}'@'localhost' IDENTIFIED BY '${MYSQL_ADMIN_PASS}';
 GRANT ALL PRIVILEGES ON *.* TO '${MYSQL_ADMIN_USER}'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 SQL
 
-echo "ℹ️  MySQL admin user '${MYSQL_ADMIN_USER}'@'localhost' aangemaakt met leeg wachtwoord."
+echo "ℹ️  MySQL admin user '${MYSQL_ADMIN_USER}'@'localhost' aangemaakt met wachtwoord."
 
 # -------------------------
 # phpMyAdmin installeren (non-interactive minimal)
@@ -145,39 +158,6 @@ else
 fi
 
 # -------------------------
-# phpMyAdmin config aanpassen: AllowNoPassword op true
-# -------------------------
-PHPMYADMIN_CONFIG="/etc/phpmyadmin/config.inc.php"
-
-if [ -f "$PHPMYADMIN_CONFIG" ]; then
-  echo "🔓 AllowNoPassword instelling activeren in phpMyAdmin..."
-  
-  # Maak backup van originele config
-  sudo cp "$PHPMYADMIN_CONFIG" "${PHPMYADMIN_CONFIG}.bak"
-  
-  # Check of de regel in commentaar staat en haal uit commentaar
-  if sudo grep -q "^[[:space:]]*//[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
-    # Regel staat in commentaar (//), haal uit commentaar en zet op true
-    sudo sed -i "s|^[[:space:]]*//[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\].*|\$cfg['Servers'][\$i]['AllowNoPassword'] = true;|" "$PHPMYADMIN_CONFIG"
-    echo "✅ AllowNoPassword uit commentaar gehaald en ingesteld op true."
-  elif sudo grep -q "^[[:space:]]*#[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
-    # Regel staat in commentaar (#), haal uit commentaar en zet op true
-    sudo sed -i "s|^[[:space:]]*#[[:space:]]*\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\].*|\$cfg['Servers'][\$i]['AllowNoPassword'] = true;|" "$PHPMYADMIN_CONFIG"
-    echo "✅ AllowNoPassword uit commentaar gehaald en ingesteld op true."
-  elif sudo grep -q "\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
-    # Bestaat al (niet in commentaar), pas aan naar true
-    sudo sed -i "s/\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]\s*=\s*false;/\$cfg['Servers'][\$i]['AllowNoPassword'] = true;/" "$PHPMYADMIN_CONFIG"
-    echo "✅ AllowNoPassword aangepast naar true."
-  else
-    # Bestaat niet, voeg toe na de auth_type regel
-    sudo sed -i "/\$cfg\['Servers'\]\[\$i\]\['auth_type'\]/a \$cfg['Servers'][\$i]['AllowNoPassword'] = true;" "$PHPMYADMIN_CONFIG"
-    echo "✅ AllowNoPassword toegevoegd en ingesteld op true."
-  fi
-else
-  echo "⚠️  phpMyAdmin config niet gevonden op $PHPMYADMIN_CONFIG"
-fi
-
-# -------------------------
 # Testpagina en final restart
 # -------------------------
 echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/index.php" > /dev/null
@@ -192,9 +172,10 @@ echo " - PHP versie: $(php -v | head -n1)"
 echo " - Ingeschakelde PHP-extensies: zip, gd, soap, xml, mysqli, pdo_mysql, curl"
 echo " - php.ini aangepast (upload_max_filesize=128M, post_max_size=128M, memory_limit=256M, display_errors=On)"
 echo " - phpMyAdmin: beschikbaar via http://localhost/phpmyadmin"
-echo " - phpMyAdmin AllowNoPassword: INGESCHAKELD"
-echo " - MySQL admin user: ${MYSQL_ADMIN_USER}@localhost (leeg wachtwoord)"
+echo " - MySQL admin user: ${MYSQL_ADMIN_USER}@localhost (met wachtwoord)"
 echo ""
-echo "⚠️ Veiligheidsherinnering: ${MYSQL_ADMIN_USER}@localhost bevat geen wachtwoord. Dit is enkel geschikt voor lokale dev. Zorg dat je dit NIET toepast op productieservers."
+echo "🔐 Login credentials voor phpMyAdmin:"
+echo "    Username: ${MYSQL_ADMIN_USER}"
+echo "    Password: [het door jou ingestelde wachtwoord]"
 echo ""
 echo "🔁 Voer 'wsl --shutdown' uit in PowerShell als je wijzigingen in /etc/wsl.conf hebt gedaan en start WSL opnieuw."
