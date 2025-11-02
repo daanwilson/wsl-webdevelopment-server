@@ -51,8 +51,8 @@ sudo chown -R $USER:www-data "$WEBROOT"
 sudo chmod -R 775 "$WEBROOT"
 
 # Vervang / voeg Directory-blok toe in apache2.conf
-sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
-sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
+#sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
+#sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
 
 <Directory $WEBROOT/>
     Options Indexes FollowSymLinks
