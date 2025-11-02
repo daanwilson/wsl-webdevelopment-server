@@ -19,5 +19,5 @@ Nu heb je een complete ubuntu omgeving welke je met WSL kunt benaderen.
 We gaan deze ubuntu omgeving inrichten als een webserver welke te benaderen is via http://localhost
 Hiervoor is een script klaargezet die de installatie runt voor je.
 
-Run: curl -s https://github.com/daanwilson/wsl-webdevelopment-server/install.sh | bash
+Run: curl -s https://raw.githubusercontent.com/daanwilson/wsl-webdevelopment-server/refs/heads/main/install.sh | bash
 

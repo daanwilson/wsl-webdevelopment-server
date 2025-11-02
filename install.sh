@@ -47,11 +47,8 @@ sudo phpenmod zip gd soap xml mysqli pdo_mysql curl
 # Apache configuratie: DocumentRoot -> $WEBROOT
 # -------------------------
 echo "🌐 Webroot instellen: $WEBROOT"
-if [ ! -d "$WEBROOT" ]; then
-  sudo mkdir -p "$WEBROOT"
-  sudo chown -R $USER:www-data "$WEBROOT"
-  sudo chmod -R 775 "$WEBROOT"
-fi
+sudo chown -R $USER:www-data "$WEBROOT"
+sudo chmod -R 775 "$WEBROOT"
 
 # Vervang / voeg Directory-blok toe in apache2.conf
 sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
