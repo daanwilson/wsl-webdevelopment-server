@@ -19,11 +19,13 @@ echo ""
 # -------------------------
 echo "📝 Database configuratie:"
 read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER
+
 while true; do
     read -sp "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS
     echo ""
     read -sp "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM
     echo ""
+    
     if [ "$MYSQL_ADMIN_PASS" = "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
         break
     else
