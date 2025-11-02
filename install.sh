@@ -7,6 +7,7 @@ set -euo pipefail
 # - past php.ini aan (enkele dev-settings)
 # - installeert phpMyAdmin en activeert de config voor Apache
 # - maakt MySQL gebruiker 'Daan'@'localhost' met leeg wachtwoord en ALL PRIVILEGES
+# - schakelt AllowNoPassword in voor phpMyAdmin
 # =====================================================
 
 WEBROOT="/var/www/html"
@@ -143,20 +144,30 @@ else
   echo "⚠️  /etc/phpmyadmin/apache.conf niet gevonden — phpMyAdmin installatie mogelijk mislukt."
 fi
 
-echo "🔧 Configureren van phpMyAdmin voor automatisch inloggen..."
+# -------------------------
+# phpMyAdmin config aanpassen: AllowNoPassword op true
+# -------------------------
+PHPMYADMIN_CONFIG="/etc/phpmyadmin/config.inc.php"
 
-sudo bash -c 'cat > /etc/phpmyadmin/config.inc.php <<EOF
-<?php
-/* phpMyAdmin automatische login voor lokale WSL setup */
-\$i = 0;
-\$i++;
-\$cfg["Servers"][\$i]["AllowNoPassword"] = true;
-\$cfg["blowfish_secret"] = "wsl_local_dev_secret";
-?>
-EOF'
-
-sudo chmod 644 /etc/phpmyadmin/config.inc.php
-sudo service apache2 restart
+if [ -f "$PHPMYADMIN_CONFIG" ]; then
+  echo "🔓 AllowNoPassword instelling activeren in phpMyAdmin..."
+  
+  # Maak backup van originele config
+  sudo cp "$PHPMYADMIN_CONFIG" "${PHPMYADMIN_CONFIG}.bak"
+  
+  # Zoek of AllowNoPassword al bestaat en pas aan, of voeg toe
+  if sudo grep -q "\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]" "$PHPMYADMIN_CONFIG"; then
+    # Bestaat al, pas aan naar true
+    sudo sed -i "s/\$cfg\['Servers'\]\[\$i\]\['AllowNoPassword'\]\s*=\s*false;/\$cfg['Servers'][\$i]['AllowNoPassword'] = true;/" "$PHPMYADMIN_CONFIG"
+    echo "✅ AllowNoPassword aangepast naar true."
+  else
+    # Bestaat niet, voeg toe na de auth_type regel
+    sudo sed -i "/\$cfg\['Servers'\]\[\$i\]\['auth_type'\]/a \$cfg['Servers'][\$i]['AllowNoPassword'] = true;" "$PHPMYADMIN_CONFIG"
+    echo "✅ AllowNoPassword toegevoegd en ingesteld op true."
+  fi
+else
+  echo "⚠️  phpMyAdmin config niet gevonden op $PHPMYADMIN_CONFIG"
+fi
 
 # -------------------------
 # Testpagina en final restart
@@ -171,8 +182,9 @@ echo "✅ Klaar! Samenvatting:"
 echo " - Apache document root: $WEBROOT"
 echo " - PHP versie: $(php -v | head -n1)"
 echo " - Ingeschakelde PHP-extensies: zip, gd, soap, xml, mysqli, pdo_mysql, curl"
-echo " - php.ini aangepast (upload_max_filesize=50M, post_max_size=50M, memory_limit=256M, display_errors=On)"
+echo " - php.ini aangepast (upload_max_filesize=128M, post_max_size=128M, memory_limit=256M, display_errors=On)"
 echo " - phpMyAdmin: beschikbaar via http://localhost/phpmyadmin"
+echo " - phpMyAdmin AllowNoPassword: INGESCHAKELD"
 echo " - MySQL admin user: ${MYSQL_ADMIN_USER}@localhost (leeg wachtwoord)"
 echo ""
 echo "⚠️ Veiligheidsherinnering: ${MYSQL_ADMIN_USER}@localhost bevat geen wachtwoord. Dit is enkel geschikt voor lokale dev. Zorg dat je dit NIET toepast op productieservers."
