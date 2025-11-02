@@ -22,20 +22,22 @@ read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER
 
 # Tijdelijk pipefail uitzetten voor read commando's
 set +e
-PASSWORDS_MATCH="no"
-while [ "$PASSWORDS_MATCH" != "yes" ]; do
+
+MYSQL_ADMIN_PASS=""
+MYSQL_ADMIN_PASS_CONFIRM="different"
+
+while [ "$MYSQL_ADMIN_PASS" != "$MYSQL_ADMIN_PASS_CONFIRM" ]; do
     read -sp "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS
     echo ""
     read -sp "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM
     echo ""
     
-    if [ "${MYSQL_ADMIN_PASS}" = "${MYSQL_ADMIN_PASS_CONFIRM}" ]; then
-        PASSWORDS_MATCH="yes"
-        echo "✅ Wachtwoorden komen overeen!"
-    else
+    if [ "$MYSQL_ADMIN_PASS" != "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
         echo "❌ Wachtwoorden komen niet overeen. Probeer opnieuw."
     fi
 done
+
+echo "✅ Wachtwoorden komen overeen!"
 set -e
 
 echo ""
