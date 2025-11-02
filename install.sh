@@ -9,7 +9,7 @@ set -euo pipefail
 # - maakt MySQL root gebruiker aan met custom username en wachtwoord
 # =====================================================
 
-WEBROOT="/var/www/html"
+WEBROOT="$HOME/projects"
 
 echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
 echo ""
@@ -18,7 +18,7 @@ echo ""
 # Vraag om database credentials
 # -------------------------
 echo "📝 Database configuratie:"
-read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER
+read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER < /dev/tty
 
 # Tijdelijk pipefail uitzetten voor read commando's
 set +e
@@ -54,6 +54,66 @@ echo "📦 Basispakketten installeren..."
 sudo apt install -y software-properties-common curl unzip git nano wget lsb-release ca-certificates apt-transport-https
 
 # -------------------------
+# Netwerk schijf toevoegen aan fstab
+# -------------------------
+echo "💾 Netwerk schijf H: toevoegen aan /etc/fstab..."
+
+# Maak mount point aan als deze niet bestaat
+sudo mkdir -p /mnt/h
+
+# Voeg H: schijf toe aan fstab als deze nog niet bestaat
+if ! grep -q "^H: /mnt/h" /etc/fstab; then
+    echo "H: /mnt/h drvfs defaults 0 0" | sudo tee -a /etc/fstab > /dev/null
+    echo "✅ H: schijf toegevoegd aan /etc/fstab"
+else
+    echo "ℹ️  H: schijf staat al in /etc/fstab"
+fi
+
+# Mount de schijf direct (als deze al gemount is, geeft dit geen error)
+sudo mount -a 2>/dev/null || true
+echo "✅ Netwerk schijf gemount op /mnt/h"
+
+# -------------------------
+# SSH sleutels kopiëren van Windows naar WSL
+# -------------------------
+echo "🔑 SSH sleutels kopiëren van Windows naar WSL..."
+
+# Bepaal Windows gebruikersnaam (uit WSLENV of PATH)
+WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+
+if [ -n "$WIN_USER" ]; then
+    WIN_SSH_DIR="/mnt/c/Users/${WIN_USER}/.ssh"
+    WSL_SSH_DIR="$HOME/.ssh"
+    
+    if [ -d "$WIN_SSH_DIR" ]; then
+        # Maak .ssh directory aan als deze niet bestaat
+        mkdir -p "$WSL_SSH_DIR"
+        
+        # Kopieer alle SSH bestanden
+        if [ -f "$WIN_SSH_DIR/id_rsa" ] || [ -f "$WIN_SSH_DIR/id_ed25519" ]; then
+            cp -n "$WIN_SSH_DIR"/* "$WSL_SSH_DIR/" 2>/dev/null || true
+            
+            # Zet correcte permissies (belangrijk voor SSH!)
+            chmod 700 "$WSL_SSH_DIR"
+            chmod 600 "$WSL_SSH_DIR"/id_* 2>/dev/null || true
+            chmod 644 "$WSL_SSH_DIR"/*.pub 2>/dev/null || true
+            chmod 644 "$WSL_SSH_DIR"/config 2>/dev/null || true
+            chmod 644 "$WSL_SSH_DIR"/known_hosts 2>/dev/null || true
+            
+            echo "✅ SSH sleutels gekopieerd naar $WSL_SSH_DIR"
+            echo "ℹ️  Gevonden sleutels:"
+            ls -la "$WSL_SSH_DIR" | grep -E "id_|config"
+        else
+            echo "⚠️  Geen SSH sleutels gevonden in $WIN_SSH_DIR"
+        fi
+    else
+        echo "⚠️  Windows .ssh directory niet gevonden: $WIN_SSH_DIR"
+    fi
+else
+    echo "⚠️  Kon Windows gebruikersnaam niet bepalen"
+fi
+
+# -------------------------
 # PHP (via Ondřej PPA) + extensies
 # -------------------------
 echo "🐘 PHP repository toevoegen en PHP installeren..."
@@ -73,11 +133,21 @@ sudo phpenmod zip gd soap xml mysqli pdo_mysql curl
 # Apache configuratie: DocumentRoot -> $WEBROOT
 # -------------------------
 echo "🌐 Webroot instellen: $WEBROOT"
+
+# Maak projects directory aan als deze niet bestaat
+mkdir -p "$WEBROOT"
+
+# Zet correcte eigenaar en permissies
 sudo chown -R $USER:www-data "$WEBROOT"
 sudo chmod -R 775 "$WEBROOT"
 
+# Update Apache's default site configuratie
+APACHE_SITE="/etc/apache2/sites-available/000-default.conf"
+sudo sed -i "s|DocumentRoot.*|DocumentRoot $WEBROOT|" "$APACHE_SITE"
+
 # Vervang / voeg Directory-blok toe in apache2.conf
 sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
+sudo sed -i "/<Directory.*\/projects>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
 sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
 
 <Directory $WEBROOT/>
@@ -86,6 +156,8 @@ sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
     Require all granted
 </Directory>
 EOL
+
+echo "✅ Apache DocumentRoot ingesteld op $WEBROOT"
 
 # --------------------------------
 # php.ini aanpassen (apache2 variant)
