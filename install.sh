@@ -21,13 +21,14 @@ echo "📝 Database configuratie:"
 read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER
 
 PASSWORDS_MATCH=false
-while [ "$PASSWORDS_MATCH" = false ]; do
+while [ "$PASSWORDS_MATCH" = "false" ]; do
     read -sp "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS
     echo ""
     read -sp "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM
     echo ""
-    if [ "$MYSQL_ADMIN_PASS" = "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
+    if [ "$MYSQL_ADMIN_PASS" == "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
         PASSWORDS_MATCH=true
+        echo "✅ Wachtwoorden komen overeen!"
     else
         echo "❌ Wachtwoorden komen niet overeen. Probeer opnieuw."
     fi
@@ -35,7 +36,7 @@ done
 
 echo ""
 echo "✅ Credentials ingesteld voor gebruiker: $MYSQL_ADMIN_USER"
-echo ""
+echo """
 
 # -------------------------
 # Updates & basispakketten
