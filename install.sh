@@ -43,12 +43,28 @@ sudo apt install -y apache2 mariadb-server \
 echo "🔌 Extensies inschakelen..."
 sudo phpenmod zip gd soap xml mysqli pdo_mysql curl
 
+# -------------------------
+# Apache configuratie: DocumentRoot -> $WEBROOT
+# -------------------------
+echo "🌐 Webroot instellen: $WEBROOT"
+sudo chown -R $USER:www-data "$WEBROOT"
+sudo chmod -R 775 "$WEBROOT"
 
+# Vervang / voeg Directory-blok toe in apache2.conf
+sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
+sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
+
+<Directory $WEBROOT/>
+    Options Indexes FollowSymLinks
+    AllowOverride All
+    Require all granted
+</Directory>
+EOL
 
 # --------------------------------
 # php.ini aanpassen (apache2 variant)
 # --------------------------------
-PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.\".\".PHP_MINOR_VERSION;')"
+PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
 PHP_INI="/etc/php/$PHP_VER/apache2/php.ini"
 
 if [ -f "$PHP_INI" ]; then
