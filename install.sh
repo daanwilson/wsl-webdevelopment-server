@@ -143,6 +143,21 @@ else
   echo "⚠️  /etc/phpmyadmin/apache.conf niet gevonden — phpMyAdmin installatie mogelijk mislukt."
 fi
 
+echo "🔧 Configureren van phpMyAdmin voor automatisch inloggen..."
+
+sudo bash -c 'cat > /etc/phpmyadmin/config.inc.php <<EOF
+<?php
+/* phpMyAdmin automatische login voor lokale WSL setup */
+\$i = 0;
+\$i++;
+\$cfg["Servers"][\$i]["AllowNoPassword"] = true;
+\$cfg["blowfish_secret"] = "wsl_local_dev_secret";
+?>
+EOF'
+
+sudo chmod 644 /etc/phpmyadmin/config.inc.php
+sudo service apache2 restart
+
 # -------------------------
 # Testpagina en final restart
 # -------------------------
