@@ -14,35 +14,9 @@ WEBROOT="$HOME/projects"
 echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
 echo ""
 
-# -------------------------
-# Vraag om database credentials
-# -------------------------
-echo "📝 Database configuratie:"
-read -p "Voer de gewenste MySQL admin username in: " MYSQL_ADMIN_USER < /dev/tty
 
-# Tijdelijk pipefail uitzetten voor read commando's
-set +e
-
-MYSQL_ADMIN_PASS=""
-MYSQL_ADMIN_PASS_CONFIRM="different"
-
-while [ "$MYSQL_ADMIN_PASS" != "$MYSQL_ADMIN_PASS_CONFIRM" ]; do
-    read -s -p "Voer het gewenste wachtwoord in: " MYSQL_ADMIN_PASS < /dev/tty
-    echo ""
-    read -s -p "Bevestig het wachtwoord: " MYSQL_ADMIN_PASS_CONFIRM < /dev/tty
-    echo ""
-    
-    if [ "$MYSQL_ADMIN_PASS" != "$MYSQL_ADMIN_PASS_CONFIRM" ]; then
-        echo "❌ Wachtwoorden komen niet overeen. Probeer opnieuw."
-    fi
-done
-
-echo "✅ Wachtwoorden komen overeen!"
-set -e
-
-echo ""
-echo "✅ Credentials ingesteld voor gebruiker: $MYSQL_ADMIN_USER"
-echo ""
+MYSQL_ADMIN_USER=$USER
+MYSQL_ADMIN_PASS=$USER
 
 # -------------------------
 # Updates & basispakketten
@@ -52,6 +26,42 @@ sudo apt update && sudo apt upgrade -y
 
 echo "📦 Basispakketten installeren..."
 sudo apt install -y software-properties-common curl unzip git nano wget lsb-release ca-certificates apt-transport-https
+
+# -------------------------
+# Apache volledig verwijderen (indien aanwezig)
+# -------------------------
+echo "🗑️  Apache volledig verwijderen (indien aanwezig)..."
+sudo systemctl stop apache2 2>/dev/null || true
+sudo apt remove --purge -y apache2 apache2-utils apache2-bin apache2-data 2>/dev/null || true
+sudo apt autoremove -y
+sudo rm -rf /etc/apache2
+sudo rm -rf /var/www
+echo "✅ Apache verwijderd"
+
+# -------------------------
+# MariaDB/MySQL volledig verwijderen (indien aanwezig)
+# -------------------------
+echo "🗑️  MariaDB/MySQL volledig verwijderen (indien aanwezig)..."
+sudo systemctl stop mariadb 2>/dev/null || true
+sudo systemctl stop mysql 2>/dev/null || true
+sudo apt remove --purge -y mariadb-server mariadb-client mariadb-common mysql-server mysql-client mysql-common 2>/dev/null || true
+sudo apt autoremove -y
+sudo rm -rf /etc/mysql
+sudo rm -rf /var/lib/mysql
+sudo rm -rf /var/log/mysql
+echo "✅ MariaDB/MySQL verwijderd"
+
+# -------------------------
+# phpMyAdmin volledig verwijderen (indien aanwezig)
+# -------------------------
+echo "🗑️  phpMyAdmin volledig verwijderen (indien aanwezig)..."
+sudo apt remove --purge -y phpmyadmin 2>/dev/null || true
+sudo apt autoremove -y
+sudo rm -rf /etc/phpmyadmin
+sudo rm -rf /usr/share/phpmyadmin
+sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf
+sudo rm -f /etc/apache2/conf-enabled/phpmyadmin.conf
+echo "✅ phpMyAdmin verwijderd"
 
 # -------------------------
 # Netwerk schijf toevoegen aan fstab
@@ -137,25 +147,49 @@ echo "🌐 Webroot instellen: $WEBROOT"
 # Maak projects directory aan als deze niet bestaat
 mkdir -p "$WEBROOT"
 
-# Zet correcte eigenaar en permissies
+# Zet correcte eigenaar en permissies op volledige pad
+sudo chmod 755 "$HOME"
 sudo chown -R $USER:www-data "$WEBROOT"
-sudo chmod -R 775 "$WEBROOT"
+sudo chmod -R 755 "$WEBROOT"
 
-# Update Apache's default site configuratie
+# Update Apache's default site configuratie volledig
 APACHE_SITE="/etc/apache2/sites-available/000-default.conf"
-sudo sed -i "s|DocumentRoot.*|DocumentRoot $WEBROOT|" "$APACHE_SITE"
+sudo tee "$APACHE_SITE" > /dev/null <<VHOST
+<VirtualHost *:80>
+    ServerAdmin webmaster@localhost
+    DocumentRoot $WEBROOT
+
+    <Directory $WEBROOT/>
+        Options Indexes FollowSymLinks MultiViews
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/error.log
+    CustomLog \${APACHE_LOG_DIR}/access.log combined
+</VirtualHost>
+VHOST
 
 # Vervang / voeg Directory-blok toe in apache2.conf
 sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
 sudo sed -i "/<Directory.*\/projects>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
 sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
 
-<Directory $WEBROOT/>
+<Directory $HOME/>
     Options Indexes FollowSymLinks
+    AllowOverride None
+    Require all granted
+</Directory>
+
+<Directory $WEBROOT/>
+    Options Indexes FollowSymLinks MultiViews
     AllowOverride All
     Require all granted
 </Directory>
 EOL
+
+# Voeg gebruiker toe aan www-data groep
+sudo usermod -a -G www-data $USER
 
 echo "✅ Apache DocumentRoot ingesteld op $WEBROOT"
 
@@ -232,16 +266,32 @@ sudo DEBIAN_FRONTEND=noninteractive apt install -y phpmyadmin
 if [ -f /etc/phpmyadmin/apache.conf ]; then
   sudo ln -sf /etc/phpmyadmin/apache.conf /etc/apache2/conf-available/phpmyadmin.conf
   sudo a2enconf phpmyadmin
-  sudo systemctl reload apache2
   echo "✅ phpMyAdmin geactiveerd in Apache (/etc/phpmyadmin)."
 else
   echo "⚠️  /etc/phpmyadmin/apache.conf niet gevonden — phpMyAdmin installatie mogelijk mislukt."
 fi
 
+# Alternatieve configuratie: maak symlink in webroot
+if [ -d /usr/share/phpmyadmin ]; then
+  sudo ln -sf /usr/share/phpmyadmin "$WEBROOT/phpmyadmin"
+  echo "✅ phpMyAdmin symlink aangemaakt in $WEBROOT/phpmyadmin"
+fi
+
+# Reload Apache om configuratie te activeren
+sudo systemctl reload apache2
+
 # -------------------------
 # Testpagina en final restart
 # -------------------------
 echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/index.php" > /dev/null
+
+# Verwijder eventuele .htaccess files die problemen kunnen veroorzaken
+sudo rm -f "$WEBROOT/.htaccess"
+
+# Zet nogmaals correcte permissies op alle bestanden
+sudo chown -R $USER:www-data "$WEBROOT"
+sudo find "$WEBROOT" -type d -exec chmod 755 {} \;
+sudo find "$WEBROOT" -type f -exec chmod 644 {} \;
 
 sudo systemctl restart apache2
 sudo systemctl restart mariadb
@@ -258,5 +308,9 @@ echo ""
 echo "🔐 Login credentials voor phpMyAdmin:"
 echo "    Username: ${MYSQL_ADMIN_USER}"
 echo "    Password: [het door jou ingestelde wachtwoord]"
+echo ""
+echo "📂 Permissies check:"
+echo "    Home directory: $(ls -ld $HOME | awk '{print $1, $3, $4}')"
+echo "    Projects directory: $(ls -ld $WEBROOT | awk '{print $1, $3, $4}')"
 echo ""
 echo "🔁 Voer 'wsl --shutdown' uit in PowerShell als je wijzigingen in /etc/wsl.conf hebt gedaan en start WSL opnieuw."
