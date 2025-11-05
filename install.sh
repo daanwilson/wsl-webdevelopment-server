@@ -93,9 +93,9 @@ echo "✅ Netwerk schijf gemount op /mnt/h"
 echo "🔑 SSH sleutels kopiëren van Windows naar WSL..."
 
 # Bepaal Windows gebruikersnaam (uit WSLENV of PATH)
-WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r' || echo "")
 
-if [ -n "$WIN_USER" ]; then
+if [ -n "$WIN_USER" ] && [ "$WIN_USER" != "" ]; then
     WIN_SSH_DIR="/mnt/c/Users/${WIN_USER}/.ssh"
     WSL_SSH_DIR="$HOME/.ssh"
     
@@ -103,12 +103,17 @@ if [ -n "$WIN_USER" ]; then
         # Maak .ssh directory aan als deze niet bestaat
         mkdir -p "$WSL_SSH_DIR"
         
-        # Kopieer alle SSH bestanden
+        # Kopieer alle SSH bestanden (alleen als ze bestaan)
         if [ -f "$WIN_SSH_DIR/id_rsa" ] || [ -f "$WIN_SSH_DIR/id_ed25519" ]; then
-            cp -n "$WIN_SSH_DIR"/* "$WSL_SSH_DIR/" 2>/dev/null || true
+            # Kopieer bestanden één voor één om fouten te voorkomen
+            for file in "$WIN_SSH_DIR"/*; do
+                if [ -f "$file" ]; then
+                    cp -n "$file" "$WSL_SSH_DIR/" 2>/dev/null || true
+                fi
+            done
             
             # Zet correcte permissies (belangrijk voor SSH!)
-            chmod 700 "$WSL_SSH_DIR"
+            chmod 700 "$WSL_SSH_DIR" || true
             chmod 600 "$WSL_SSH_DIR"/id_* 2>/dev/null || true
             chmod 644 "$WSL_SSH_DIR"/*.pub 2>/dev/null || true
             chmod 644 "$WSL_SSH_DIR"/config 2>/dev/null || true
@@ -116,7 +121,7 @@ if [ -n "$WIN_USER" ]; then
             
             echo "✅ SSH sleutels gekopieerd naar $WSL_SSH_DIR"
             echo "ℹ️  Gevonden sleutels:"
-            ls -la "$WSL_SSH_DIR" | grep -E "id_|config"
+            ls -la "$WSL_SSH_DIR" 2>/dev/null | grep -E "id_|config" || echo "   Geen sleutels gevonden"
         else
             echo "⚠️  Geen SSH sleutels gevonden in $WIN_SSH_DIR"
         fi
@@ -124,8 +129,10 @@ if [ -n "$WIN_USER" ]; then
         echo "⚠️  Windows .ssh directory niet gevonden: $WIN_SSH_DIR"
     fi
 else
-    echo "⚠️  Kon Windows gebruikersnaam niet bepalen"
+    echo "⚠️  Kon Windows gebruikersnaam niet bepalen - SSH kopiëren overgeslagen"
 fi
+
+echo "ℹ️  SSH sectie voltooid, verder met PHP installatie..."
 
 # -------------------------
 # PHP (via Ondřej PPA) + extensies
@@ -302,7 +309,7 @@ echo " - MySQL admin user: ${MYSQL_ADMIN_USER}@localhost (met wachtwoord)"
 echo ""
 echo "🔐 Login credentials voor phpMyAdmin:"
 echo "    Username: ${MYSQL_ADMIN_USER}"
-echo "    Password: [het door jou ingestelde wachtwoord]"
+echo "    Password: ${MYSQL_ADMIN_PASS}"
 echo ""
 echo "📂 Permissies check:"
 echo "    Home directory: $(ls -ld $HOME | awk '{print $1, $3, $4}')"
