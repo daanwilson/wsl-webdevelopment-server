@@ -9,11 +9,15 @@ set -euo pipefail
 # - maakt MySQL root gebruiker aan met custom username en wachtwoord
 # =====================================================
 
-WEBROOT="$HOME/projects"
+WEBROOT="/var/www/html"
 
 echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
 echo ""
 
+# -------------------------
+# Vraag om database credentials
+# -------------------------
+echo "📝 Database configuratie:"
 
 MYSQL_ADMIN_USER=$USER
 MYSQL_ADMIN_PASS=$USER
@@ -144,11 +148,10 @@ sudo phpenmod zip gd soap xml mysqli pdo_mysql curl
 # -------------------------
 echo "🌐 Webroot instellen: $WEBROOT"
 
-# Maak projects directory aan als deze niet bestaat
-mkdir -p "$WEBROOT"
+# Maak webroot directory aan als deze niet bestaat
+sudo mkdir -p "$WEBROOT"
 
-# Zet correcte eigenaar en permissies op volledige pad
-sudo chmod 755 "$HOME"
+# Zet correcte eigenaar en permissies
 sudo chown -R $USER:www-data "$WEBROOT"
 sudo chmod -R 755 "$WEBROOT"
 
@@ -170,16 +173,8 @@ sudo tee "$APACHE_SITE" > /dev/null <<VHOST
 </VirtualHost>
 VHOST
 
-# Vervang / voeg Directory-blok toe in apache2.conf
-sudo sed -i "/<Directory \/var\/www\/>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
-sudo sed -i "/<Directory.*\/projects>/,/<\/Directory>/d" /etc/apache2/apache2.conf || true
+# Voeg Directory-blok toe in apache2.conf
 sudo tee -a /etc/apache2/apache2.conf > /dev/null <<EOL
-
-<Directory $HOME/>
-    Options Indexes FollowSymLinks
-    AllowOverride None
-    Require all granted
-</Directory>
 
 <Directory $WEBROOT/>
     Options Indexes FollowSymLinks MultiViews
@@ -246,7 +241,7 @@ GRANT ALL PRIVILEGES ON *.* TO '${MYSQL_ADMIN_USER}'@'localhost' WITH GRANT OPTI
 FLUSH PRIVILEGES;
 SQL
 
-echo "ℹ️  MySQL admin user '${MYSQL_ADMIN_USER}'@'localhost' aangemaakt met wachtwoord."
+echo "ℹ️  MySQL admin user '${MYSQL_ADMIN_USER}'@'localhost' aangemaakt met wachtwoord: ${MYSQL_ADMIN_PASS}"
 
 # -------------------------
 # phpMyAdmin installeren (non-interactive minimal)
