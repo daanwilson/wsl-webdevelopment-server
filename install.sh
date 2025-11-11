@@ -350,6 +350,7 @@ if [ -f "$WEBROOT/index.php" ]; then
 
   if [ -n "${MYSQL_ADMIN_USER:-}" ] || [ -n "${MYSQL_ADMIN_PASS:-}" ]; then
     if grep -q -E '(\$?MYSQL_ADMIN_USER|\$?MYSQL_ADMIN_PASS)' "$WEBROOT/index.php"; then
+      MYSQL_ADMIN_USER="${MYSQL_ADMIN_USER}" MYSQL_ADMIN_PASS="${MYSQL_ADMIN_PASS}" \
       perl -0777 -i -pe '
         my $u = $ENV{MYSQL_ADMIN_USER} // "";
         my $p = $ENV{MYSQL_ADMIN_PASS} // "";
@@ -358,7 +359,7 @@ if [ -f "$WEBROOT/index.php" ]; then
         s/\$MYSQL_ADMIN_PASS/\Q$p\E/g;
         s/MYSQL_ADMIN_PASS/\Q$p\E/g;
       ' "$WEBROOT/index.php"
-      echo "✅ Placeholders in index.php vervangen met MYSQL_ADMIN_USER/MYSQL_ADMIN_PASS."
+      echo "✅ Placeholders in index.php vervangen met MYSQL_ADMIN_USER/MYSQL_ADMIN_PASS. (user='${MYSQL_ADMIN_USER:+***}', pass='${MYSQL_ADMIN_PASS:+***}')"
     else
       echo "ℹ️  Geen MYSQL_ADMIN_* placeholders gevonden in index.php; geen vervanging nodig."
     fi
