@@ -343,6 +343,30 @@ sudo rm -f "$WEBROOT/index.php"
 # Kopieer de index.php uit de repository naar WEBROOT
 curl -s https://raw.githubusercontent.com/daanwilson/wsl-webdevelopment-server/refs/heads/main/index.php -o "$WEBROOT/index.php"
 
+# Vervang eventuele placeholders in index.php met de waarden uit dit script
+if [ -f "$WEBROOT/index.php" ]; then
+  # Backup maken
+  cp "$WEBROOT/index.php" "$WEBROOT/index.php.bak"
+
+  if [ -n "${MYSQL_ADMIN_USER:-}" ] || [ -n "${MYSQL_ADMIN_PASS:-}" ]; then
+    if grep -q -E '(\$?MYSQL_ADMIN_USER|\$?MYSQL_ADMIN_PASS)' "$WEBROOT/index.php"; then
+      perl -0777 -i -pe '
+        my $u = $ENV{MYSQL_ADMIN_USER} // "";
+        my $p = $ENV{MYSQL_ADMIN_PASS} // "";
+        s/\$MYSQL_ADMIN_USER/\Q$u\E/g;
+        s/MYSQL_ADMIN_USER/\Q$u\E/g;
+        s/\$MYSQL_ADMIN_PASS/\Q$p\E/g;
+        s/MYSQL_ADMIN_PASS/\Q$p\E/g;
+      ' "$WEBROOT/index.php"
+      echo "✅ Placeholders in index.php vervangen met MYSQL_ADMIN_USER/MYSQL_ADMIN_PASS."
+    else
+      echo "ℹ️  Geen MYSQL_ADMIN_* placeholders gevonden in index.php; geen vervanging nodig."
+    fi
+  else
+    echo "⚠️  MYSQL_ADMIN_USER of MYSQL_ADMIN_PASS is leeg; overslaan van placeholder-vervanging."
+  fi
+fi
+
 # Maak info.php aan met phpinfo()
 echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/info.php" > /dev/null
 echo "✅ info.php aangemaakt voor diagnose"

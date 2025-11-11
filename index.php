@@ -24,6 +24,37 @@ try {
     $directories = [];
     $error = "Fout bij het lezen van de directory: " . htmlspecialchars($e->getMessage());
 }
+
+// Versie-informatie voorbereiden
+$phpVersion = PHP_VERSION;
+$mysqlVersionDisplay = 'n.v.t.'; // standaard: niet beschikbaar
+
+// Alleen proberen te verbinden als omgevingsvariabelen zijn gezet
+$mysqlHost = getenv('MYSQL_HOST') ?: 'localhost';
+$mysqlUser = getenv('MYSQL_USER') ?: '$MYSQL_ADMIN_USER';
+$mysqlPass = getenv('MYSQL_PASSWORD') ?: '$MYSQL_ADMIN_PASS';
+$mysqlPort = getenv('MYSQL_PORT') ?: '';
+$mysqlDb   = getenv('MYSQL_DATABASE') ?: '';
+
+if ($mysqlHost !== '' && $mysqlUser !== '') {
+    // Stel een korte timeout in zodat de pagina niet hangt
+    $mysqli = mysqli_init();
+    if ($mysqli) {
+        if ($mysqlPort === '') { $mysqlPort = 3306; }
+        @mysqli_options($mysqli, MYSQLI_OPT_CONNECT_TIMEOUT, 2);
+        // Probeer verbinding (database is optioneel voor VERSION())
+        if (@$mysqli->real_connect($mysqlHost, $mysqlUser, $mysqlPass, $mysqlDb ?: null, (int)$mysqlPort)) {
+            if ($result = @$mysqli->query('SELECT VERSION() AS v')) {
+                if ($row = $result->fetch_assoc()) {
+                    $mysqlVersionDisplay = $row['v'];
+                }
+                $result->free();
+            }
+            $mysqli->close();
+        }
+        // Bij fouten laten we de standaard 'n.v.t.' staan zonder waarschuwingen te tonen
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="nl">
@@ -119,6 +150,12 @@ try {
                     <i class="bi bi-search" style="font-size: 3rem;"></i>
                     <h4 class="mt-3">Geen mappen gevonden</h4>
                     <p class="text-muted">Probeer een andere zoekterm</p>
+                </div>
+            </div>
+            <div class="card-footer bg-white border-0 pt-0">
+                <div class="d-flex justify-content-between small text-muted">
+                    <span><i class="bi bi-code-slash"></i> PHP: <?php echo htmlspecialchars($phpVersion); ?></span>
+                    <span><i class="bi bi-database"></i> MySQL: <?php echo htmlspecialchars($mysqlVersionDisplay); ?></span>
                 </div>
             </div>
         </div>
