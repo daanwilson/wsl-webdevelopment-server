@@ -377,8 +377,8 @@ sudo rm -f "$WEBROOT/.htaccess"
 # Zet nogmaals correcte permissies op alle bestanden
 echo "⌛ Zet correcte permissies op alle bestanden, dit kan even duren...."
 sudo chown -R $USER:www-data "$WEBROOT"
-sudo find "$WEBROOT" -type d -exec chmod 755 {} \;
-sudo find "$WEBROOT" -type f -exec chmod 644 {} \;
+sudo chmod -R 775 "$WEBROOT"
+
 echo "✅ Rechten ingesteld"
 
 sudo systemctl restart apache2
