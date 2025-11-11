@@ -341,7 +341,7 @@ sudo rm -f "$WEBROOT/index.html"
 sudo rm -f "$WEBROOT/index.php"
 
 # Kopieer de index.php uit de repository naar WEBROOT
-curl -s https://raw.githubusercontent.com/daanwilson/wsl-webdevelopment-server/refs/heads/main/index.php -o index.php
+curl -s https://raw.githubusercontent.com/daanwilson/wsl-webdevelopment-server/refs/heads/main/index.php -o "$WEBROOT/index.php"
 
 # Maak info.php aan met phpinfo()
 echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/info.php" > /dev/null
