@@ -23,15 +23,6 @@ echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
 echo ""
 
 # -------------------------
-# Updates & basispakketten
-# -------------------------
-echo "🔄 Systeem updaten..."
-sudo apt update && sudo apt upgrade -y
-
-echo "📦 Basispakketten installeren..."
-sudo apt install -y software-properties-common curl unzip git nano wget lsb-release ca-certificates apt-transport-https
-
-# -------------------------
 # Vraag om schone installatie
 # -------------------------
 echo "❓ Wil je een schone installatie uitvoeren?"
@@ -57,6 +48,15 @@ else
 fi
 
 echo ""
+
+# -------------------------
+# Updates & basispakketten
+# -------------------------
+echo "🔄 Systeem updaten..."
+sudo apt update && sudo apt upgrade -y
+
+echo "📦 Basispakketten installeren..."
+sudo apt install -y software-properties-common curl unzip git nano wget lsb-release ca-certificates apt-transport-https
 
 # -------------------------
 # Apache volledig verwijderen (indien gewenst)
