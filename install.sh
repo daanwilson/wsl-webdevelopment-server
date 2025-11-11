@@ -237,7 +237,18 @@ echo "✅ Apache DocumentRoot ingesteld op $WEBROOT"
 # --------------------------------
 # php.ini aanpassen (apache2 variant)
 # --------------------------------
-PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".PHP_MINOR_VERSION;')"
+# Zorg dat Xdebug logpad bestaat om warnings/aborts te voorkomen als Xdebug geactiveerd is
+sudo mkdir -p /var/log/xdebug 2>/dev/null || true
+sudo touch /var/log/xdebug/xdebug.log 2>/dev/null || true
+sudo chown www-data:adm /var/log/xdebug /var/log/xdebug/xdebug.log 2>/dev/null || true
+sudo chmod 775 /var/log/xdebug 2>/dev/null || true
+sudo chmod 664 /var/log/xdebug/xdebug.log 2>/dev/null || true
+
+# Bepaal PHP hoofdversie; onderdruk eventuele Xdebug-stderr en voorkom aborts
+set +e
+PHP_VER="$(php -r 'echo PHP_MAJOR_VERSION.".".;' 2>/dev/null)"
+set -e
+PHP_VER="${PHP_VER:-8.}"
 PHP_INI="/etc/php/$PHP_VER/apache2/php.ini"
 
 if [ -f "$PHP_INI" ]; then
