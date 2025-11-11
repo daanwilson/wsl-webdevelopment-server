@@ -37,7 +37,15 @@ sudo apt install -y software-properties-common curl unzip git nano wget lsb-rele
 echo "❓ Wil je een schone installatie uitvoeren?"
 echo "   Dit verwijdert Apache, MariaDB/MySQL en phpMyAdmin volledig."
 echo ""
-read -p "Voer schone installatie uit? (j/n) [n]: " -r CLEAN_INSTALL
+if [ -e /dev/tty ]; then
+    # Lees altijd van de TTY, ook wanneer het script via een pipe wordt gestart (curl ... | bash)
+    if ! read -p "Voer schone installatie uit? (j/n) [n]: " -r CLEAN_INSTALL </dev/tty; then
+        CLEAN_INSTALL="n"
+    fi
+else
+    echo "Niet-interactieve omgeving gedetecteerd; standaardantwoord: n"
+    CLEAN_INSTALL="n"
+fi
 CLEAN_INSTALL=${CLEAN_INSTALL:-n}
 
 if [[ "$CLEAN_INSTALL" =~ ^[Jj]$ ]]; then
