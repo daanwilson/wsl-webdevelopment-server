@@ -11,16 +11,16 @@ set -euo pipefail
 
 WEBROOT="/var/www/html"
 
-echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
-echo ""
-
 # -------------------------
-# Vraag om database credentials
+# Database credentials
 # -------------------------
-echo "📝 Database configuratie:"
 
 MYSQL_ADMIN_USER=$USER
 MYSQL_ADMIN_PASS=$USER
+
+
+echo "🚀 Start installatie: Apache, PHP (+exts), MariaDB, phpMyAdmin"
+echo ""
 
 # -------------------------
 # Updates & basispakketten
@@ -32,40 +32,71 @@ echo "📦 Basispakketten installeren..."
 sudo apt install -y software-properties-common curl unzip git nano wget lsb-release ca-certificates apt-transport-https
 
 # -------------------------
-# Apache volledig verwijderen (indien aanwezig)
+# Vraag om schone installatie
 # -------------------------
-echo "🗑️  Apache volledig verwijderen (indien aanwezig)..."
-sudo systemctl stop apache2 2>/dev/null || true
-sudo apt remove --purge -y apache2 apache2-utils apache2-bin apache2-data 2>/dev/null || true
-sudo apt autoremove -y
-sudo rm -rf /etc/apache2
-sudo rm -rf /var/www
-echo "✅ Apache verwijderd"
+echo "❓ Wil je een schone installatie uitvoeren?"
+echo "   Dit verwijdert Apache, MariaDB/MySQL en phpMyAdmin volledig."
+echo ""
+read -p "Voer schone installatie uit? (j/n) [n]: " -r CLEAN_INSTALL
+CLEAN_INSTALL=${CLEAN_INSTALL:-n}
+
+if [[ "$CLEAN_INSTALL" =~ ^[Jj]$ ]]; then
+    CLEAN_INSTALL=true
+    echo "✅ Schone installatie geselecteerd - bestaande software wordt verwijderd"
+else
+    CLEAN_INSTALL=false
+    echo "ℹ️  Bestaande installaties blijven behouden"
+fi
+
+echo ""
 
 # -------------------------
-# MariaDB/MySQL volledig verwijderen (indien aanwezig)
+# Apache volledig verwijderen (indien gewenst)
 # -------------------------
-echo "🗑️  MariaDB/MySQL volledig verwijderen (indien aanwezig)..."
-sudo systemctl stop mariadb 2>/dev/null || true
-sudo systemctl stop mysql 2>/dev/null || true
-sudo apt remove --purge -y mariadb-server mariadb-client mariadb-common mysql-server mysql-client mysql-common 2>/dev/null || true
-sudo apt autoremove -y
-sudo rm -rf /etc/mysql
-sudo rm -rf /var/lib/mysql
-sudo rm -rf /var/log/mysql
-echo "✅ MariaDB/MySQL verwijderd"
+if [ "$CLEAN_INSTALL" = true ]; then
+    echo "🗑️  Apache volledig verwijderen..."
+    sudo systemctl stop apache2 2>/dev/null || true
+    sudo apt remove --purge -y apache2 apache2-utils apache2-bin apache2-data 2>/dev/null || true
+    sudo apt autoremove -y
+    sudo rm -rf /etc/apache2
+    sudo rm -rf /var/www
+    echo "✅ Apache verwijderd"
+else
+    echo "⏭️  Apache verwijderen overgeslagen"
+fi
 
 # -------------------------
-# phpMyAdmin volledig verwijderen (indien aanwezig)
+# MariaDB/MySQL volledig verwijderen (indien gewenst)
 # -------------------------
-echo "🗑️  phpMyAdmin volledig verwijderen (indien aanwezig)..."
-sudo apt remove --purge -y phpmyadmin 2>/dev/null || true
-sudo apt autoremove -y
-sudo rm -rf /etc/phpmyadmin
-sudo rm -rf /usr/share/phpmyadmin
-sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf
-sudo rm -f /etc/apache2/conf-enabled/phpmyadmin.conf
-echo "✅ phpMyAdmin verwijderd"
+if [ "$CLEAN_INSTALL" = true ]; then
+    echo "🗑️  MariaDB/MySQL volledig verwijderen..."
+    sudo systemctl stop mariadb 2>/dev/null || true
+    sudo systemctl stop mysql 2>/dev/null || true
+    sudo apt remove --purge -y mariadb-server mariadb-client mariadb-common mysql-server mysql-client mysql-common 2>/dev/null || true
+    sudo apt autoremove -y
+    sudo rm -rf /etc/mysql
+    sudo rm -rf /var/lib/mysql
+    sudo rm -rf /var/log/mysql
+    echo "✅ MariaDB/MySQL verwijderd"
+else
+    echo "⏭️  MariaDB/MySQL verwijderen overgeslagen"
+fi
+
+# -------------------------
+# phpMyAdmin volledig verwijderen (indien gewenst)
+# -------------------------
+if [ "$CLEAN_INSTALL" = true ]; then
+    echo "🗑️  phpMyAdmin volledig verwijderen..."
+    sudo apt remove --purge -y phpmyadmin 2>/dev/null || true
+    sudo apt autoremove -y
+    sudo rm -rf /etc/phpmyadmin
+    sudo rm -rf /usr/share/phpmyadmin
+    sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf
+    sudo rm -f /etc/apache2/conf-enabled/phpmyadmin.conf
+    echo "✅ phpMyAdmin verwijderd"
+else
+    echo "⏭️  phpMyAdmin verwijderen overgeslagen"
+fi
 
 # -------------------------
 # Netwerk schijf toevoegen aan fstab
@@ -285,7 +316,24 @@ sudo systemctl reload apache2
 # -------------------------
 # Testpagina en final restart
 # -------------------------
-echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/index.php" > /dev/null
+
+# Verwijder oude index.html en index.php
+sudo rm -f "$WEBROOT/index.html"
+sudo rm -f "$WEBROOT/index.php"
+
+# Kopieer de index.php uit de repository naar WEBROOT
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/index.php" ]; then
+    sudo cp "$SCRIPT_DIR/index.php" "$WEBROOT/index.php"
+    echo "✅ index.php uit repository gekopieerd naar $WEBROOT"
+else
+    echo "⚠️  index.php niet gevonden in $SCRIPT_DIR — standaard index pagina gemaakt"
+    echo "<!DOCTYPE html><html><head><title>Web Server</title></head><body><h1>Web Server Actief</h1></body></html>" | sudo tee "$WEBROOT/index.html" > /dev/null
+fi
+
+# Maak info.php aan met phpinfo()
+echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/info.php" > /dev/null
+echo "✅ info.php aangemaakt voor diagnose"
 
 # Verwijder eventuele .htaccess files die problemen kunnen veroorzaken
 sudo rm -f "$WEBROOT/.htaccess"

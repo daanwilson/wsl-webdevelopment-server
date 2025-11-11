@@ -81,9 +81,14 @@ try {
     <div class="container">
         <div class="card">
             <div class="card-body p-4">
-                <h1 class="text-center mb-4">
-                    <i class="bi bi-folder2-open"></i> Mijn projecten
-                </h1>
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="text-center flex-grow-1 mb-0">
+                        <i class="bi bi-folder2-open"></i> Mijn projecten
+                    </h1>
+                    <a href="info.php" target="_blank" class="btn btn-info btn-sm">
+                        <i class="bi bi-info-circle"></i> PHP Info
+                    </a>
+                </div>
                 
                 <!-- Zoekbalk -->
                 <div class="mb-4">
