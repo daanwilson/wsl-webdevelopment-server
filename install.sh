@@ -131,34 +131,55 @@ echo "✅ Netwerk schijf gemount op /mnt/h"
 # -------------------------
 echo "🔑 SSH sleutels kopiëren van Windows naar WSL..."
 
-# Bepaal Windows gebruikersnaam (uit WSLENV of PATH)
-WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r' || echo "")
+# Maak deze sectie niet-fataal: we willen nooit de installatie afbreken als Windows-interop ontbreekt
+set +e
+set +o pipefail 2>/dev/null || true
 
-if [ -n "$WIN_USER" ] && [ "$WIN_USER" != "" ]; then
+# Bepaal Windows gebruikersnaam (meerdere fallback-methodes); env WIN_USER heeft voorrang
+WIN_USER="${WIN_USER:-}"
+if [ -z "$WIN_USER" ]; then
+    if command -v cmd.exe >/dev/null 2>&1; then
+        WIN_USER=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r' || echo "")
+    elif command -v powershell.exe >/dev/null 2>&1; then
+        WIN_USER=$(powershell.exe -NoProfile -Command "$env:UserName" 2>/dev/null | tr -d '\r' || echo "")
+    fi
+fi
+
+# Laatste fallback: zoek een .ssh map onder /mnt/c/Users
+if [ -z "$WIN_USER" ]; then
+    for udir in /mnt/c/Users/*; do
+        if [ -d "$udir/.ssh" ]; then
+            WIN_USER=$(basename "$udir")
+            break
+        fi
+    done
+fi
+
+if [ -n "$WIN_USER" ]; then
     WIN_SSH_DIR="/mnt/c/Users/${WIN_USER}/.ssh"
     WSL_SSH_DIR="$HOME/.ssh"
-    
+
     if [ -d "$WIN_SSH_DIR" ]; then
         # Maak .ssh directory aan als deze niet bestaat
         mkdir -p "$WSL_SSH_DIR"
-        
+
         # Kopieer alle SSH bestanden (alleen als ze bestaan)
-        if [ -f "$WIN_SSH_DIR/id_rsa" ] || [ -f "$WIN_SSH_DIR/id_ed25519" ]; then
-            # Kopieer bestanden één voor één om fouten te voorkomen
+        if [ -f "$WIN_SSH_DIR/id_rsa" ] || [ -f "$WIN_SSH_DIR/id_ed25519" ] || ls "$WIN_SSH_DIR"/*.pub >/dev/null 2>&1; then
+            # Kopieer bestanden één voor één om fouten te voorkomen; oversla bestaande
             for file in "$WIN_SSH_DIR"/*; do
                 if [ -f "$file" ]; then
                     cp -n "$file" "$WSL_SSH_DIR/" 2>/dev/null || true
                 fi
             done
-            
+
             # Zet correcte permissies (belangrijk voor SSH!)
-            chmod 700 "$WSL_SSH_DIR" || true
+            chmod 700 "$WSL_SSH_DIR" 2>/dev/null || true
             chmod 600 "$WSL_SSH_DIR"/id_* 2>/dev/null || true
             chmod 644 "$WSL_SSH_DIR"/*.pub 2>/dev/null || true
             chmod 644 "$WSL_SSH_DIR"/config 2>/dev/null || true
             chmod 644 "$WSL_SSH_DIR"/known_hosts 2>/dev/null || true
-            
-            echo "✅ SSH sleutels gekopieerd naar $WSL_SSH_DIR"
+
+            echo "✅ SSH sleutels (indien aanwezig) gekopieerd naar $WSL_SSH_DIR"
             echo "ℹ️  Gevonden sleutels:"
             ls -la "$WSL_SSH_DIR" 2>/dev/null | grep -E "id_|config" || echo "   Geen sleutels gevonden"
         else
@@ -168,8 +189,12 @@ if [ -n "$WIN_USER" ] && [ "$WIN_USER" != "" ]; then
         echo "⚠️  Windows .ssh directory niet gevonden: $WIN_SSH_DIR"
     fi
 else
-    echo "⚠️  Kon Windows gebruikersnaam niet bepalen - SSH kopiëren overgeslagen"
+    echo "⚠️  Kon Windows gebruikersnaam niet bepalen of Windows-interop is uitgeschakeld - SSH kopiëren overgeslagen"
 fi
+
+# Herstel strikte foutafhandeling voor de rest van het script
+set -e
+set -o pipefail 2>/dev/null || true
 
 echo "ℹ️  SSH sectie voltooid, verder met PHP installatie..."
 
