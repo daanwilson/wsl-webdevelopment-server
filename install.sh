@@ -341,14 +341,7 @@ sudo rm -f "$WEBROOT/index.html"
 sudo rm -f "$WEBROOT/index.php"
 
 # Kopieer de index.php uit de repository naar WEBROOT
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-if [ -f "$SCRIPT_DIR/index.php" ]; then
-    sudo cp "$SCRIPT_DIR/index.php" "$WEBROOT/index.php"
-    echo "✅ index.php uit repository gekopieerd naar $WEBROOT"
-else
-    echo "⚠️  index.php niet gevonden in $SCRIPT_DIR — standaard index pagina gemaakt"
-    echo "<!DOCTYPE html><html><head><title>Web Server</title></head><body><h1>Web Server Actief</h1></body></html>" | sudo tee "$WEBROOT/index.html" > /dev/null
-fi
+curl -s https://raw.githubusercontent.com/daanwilson/wsl-webdevelopment-server/refs/heads/main/index.php -o index.php
 
 # Maak info.php aan met phpinfo()
 echo "<?php phpinfo(); ?>" | sudo tee "$WEBROOT/info.php" > /dev/null
@@ -358,9 +351,11 @@ echo "✅ info.php aangemaakt voor diagnose"
 sudo rm -f "$WEBROOT/.htaccess"
 
 # Zet nogmaals correcte permissies op alle bestanden
+echo "⌛ Zet correcte permissies op alle bestanden, dit kan even duren...."
 sudo chown -R $USER:www-data "$WEBROOT"
 sudo find "$WEBROOT" -type d -exec chmod 755 {} \;
 sudo find "$WEBROOT" -type f -exec chmod 644 {} \;
+echo "✅ Rechten ingesteld"
 
 sudo systemctl restart apache2
 sudo systemctl restart mariadb
